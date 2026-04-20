@@ -6,36 +6,45 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email    = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
-require 'connection.php';
 
-$stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
-$stmt->execute([$email]);
-$user = $stmt->fetch();
+    try {
+        require 'connection.php';
 
-if ($user && password_verify($password, $user['password'])) {
-    $_SESSION['user_id'] = $user['id'];
-    $_SESSION['user']    = $user['email'];
-    $_SESSION['name']    = $user['name'];
-    header('Location: dashboard.php');
-    exit;
-} else {
-    $error = 'Invalid email or password. Please try again.';
-}
-    // --- Replace this block with your real DB lookup ---
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
+        $stmt->execute([$email]);
+        $user = $stmt->fetch();
 
-    // --- End block ---
+        if ($user && password_verify($password, $user['password'])) {
+            $_SESSION['user_id'] = $user['user_id'] ?? "";
+            $_SESSION['user']    = $user['email'];
+            $_SESSION['name']    = $user['name'];
+            header('Location: dashboard.php');
+            exit;
+        } else {
+            $error = 'Invalid email or password. Please try again.';
+        }
+    } catch (Exception $e) {
+        $error = 'Database connection error. Please try again later.';
+        error_log('Login database error: ' . $e->getMessage());
+    }
 }
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Sign In — UMU SKILLS MARKET PLACE </title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes"/>
+  <meta name="description" content="UMU Skills Marketplace Login"/>
+  <title>Sign In — UMU SKILLS MARKETPLACE</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { 
+      box-sizing: border-box; 
+      margin: 0; 
+      padding: 0; 
+    }
 
     :root {
       --ink:      #0e0e0e;
@@ -47,14 +56,16 @@ if ($user && password_verify($password, $user['password'])) {
       --error:    #b8332a;
     }
 
-    html, body {
+    html { 
+      height: 100%;
+      scroll-behavior: smooth;
+    }
+
+    body {
       height: 100%;
       background: var(--paper);
       font-family: 'DM Sans', sans-serif;
       color: var(--ink);
-    }
-
-    body {
       display: grid;
       grid-template-columns: 1fr 1fr;
       min-height: 100vh;
@@ -63,57 +74,73 @@ if ($user && password_verify($password, $user['password'])) {
     /* ── Left panel ── */
     .panel-left {
       position: relative;
-      background: var(--ink);
+      background: white url('um.jpg') no-repeat center;
+      background-size: 100% 100%;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       padding: 3rem;
       overflow: hidden;
+      min-height: 100vh;
+      width: 100%;
     }
 
     .panel-left::before {
       content: '';
       position: absolute;
-      inset: 0;
-      background:
-        radial-gradient(ellipse 60% 50% at 20% 80%, rgba(200,82,42,.35) 0%, transparent 70%),
-        radial-gradient(ellipse 40% 40% at 80% 20%, rgba(200,82,42,.15) 0%, transparent 60%);
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      background: rgba(0, 0, 0, 0.1);
+      z-index: 1;
     }
 
     .brand {
       position: relative;
       font-family: 'DM Serif Display', serif;
       font-size: 1.6rem;
-      color: var(--paper);
+      color: #000000;
       letter-spacing: -.02em;
+      font-weight: 700;
+      text-shadow: 0 2px 4px rgba(255, 255, 255, 0.8);
+      z-index: 2;
     }
 
-    .brand span { color: var(--accent); }
+    .brand span { 
+      color: #ff0000;
+      font-weight: 800;
+    }
 
     .hero-text {
       position: relative;
-      z-index: 1;
+      z-index: 2;
     }
 
     .hero-text h1 {
       font-family: 'DM Serif Display', serif;
       font-size: clamp(2.4rem, 4vw, 3.6rem);
-      color: var(--paper);
+      color: #000000;
       line-height: 1.1;
       margin-bottom: 1.2rem;
+      font-weight: 800;
+      text-shadow: 0 2px 6px rgba(255, 255, 255, 0.9);
     }
 
     .hero-text h1 em {
       font-style: italic;
-      color: var(--accent);
+      color: #cc0000;
+      font-weight: 900;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
     }
 
     .hero-text p {
       font-size: .95rem;
-      color: var(--muted);
+      color: #1a1a1a;
       line-height: 1.65;
       max-width: 30ch;
-      font-weight: 300;
+      font-weight: 500;
+      text-shadow: 0 1px 2px rgba(255, 255, 255, 0.7);
     }
 
     .decorative-ring {
@@ -121,11 +148,12 @@ if ($user && password_verify($password, $user['password'])) {
       width: 420px;
       height: 420px;
       border-radius: 50%;
-      border: 1px solid rgba(200,82,42,.2);
+      border: 1px solid rgba(255, 0, 0, 0.1);
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
       animation: spin 30s linear infinite;
+      z-index: 1;
     }
 
     .decorative-ring::after {
@@ -134,7 +162,7 @@ if ($user && password_verify($password, $user['password'])) {
       width: 260px;
       height: 260px;
       border-radius: 50%;
-      border: 1px solid rgba(200,82,42,.12);
+      border: 1px solid rgba(255, 0, 0, 0.05);
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
@@ -145,8 +173,11 @@ if ($user && password_verify($password, $user['password'])) {
     .left-footer {
       position: relative;
       font-size: .78rem;
-      color: var(--muted);
+      color: #000000;
       letter-spacing: .04em;
+      font-weight: 600;
+      text-shadow: 0 1px 2px rgba(255, 255, 255, 0.6);
+      z-index: 2;
     }
 
     /* ── Right panel ── */
@@ -156,6 +187,8 @@ if ($user && password_verify($password, $user['password'])) {
       justify-content: center;
       padding: 2rem;
       background: var(--paper);
+      min-height: 100vh;
+      overflow-y: auto;
     }
 
     .form-card {
@@ -171,6 +204,7 @@ if ($user && password_verify($password, $user['password'])) {
 
     .form-header {
       margin-bottom: 2.5rem;
+      min-height: 120px;
     }
 
     .form-header h2 {
@@ -193,22 +227,19 @@ if ($user && password_verify($password, $user['password'])) {
     }
 
     .form-header p a:hover { text-decoration: underline; }
-.form-header{
-  min-height: 120px;
-}
+
     /* error banner */
     .error-banner {
       background: #fdf0ef;
       border: 1px solid #f2c4c0;
       color: var(--error);
       border-radius: 8px;
-      padding: .75rem 1rem;
+      padding: 1rem;
       font-size: .85rem;
       margin-bottom: 1.5rem;
-      margin-bottom: 10px;
       display: flex;
-      align-items: center;
-      gap: .5rem;
+      align-items: flex-start;
+      gap: .75rem;
     }
 
     /* field */
@@ -246,6 +277,11 @@ if ($user && password_verify($password, $user['password'])) {
       color: var(--ink);
       transition: border-color .2s, box-shadow .2s;
       outline: none;
+    }
+
+    .field input::placeholder {
+      color: var(--muted);
+      opacity: 0.6;
     }
 
     .field input:focus {
@@ -340,11 +376,10 @@ if ($user && password_verify($password, $user['password'])) {
     }
 
 .main-logo {
-height: 50px;
-width:auto;
-display:block;
-margin:o auto;
-
+  height: 50px;
+  width: auto;
+  display: block;
+  margin: 0 auto;
 }
     .btn-oauth {
       width: 100%;
@@ -367,9 +402,42 @@ margin:o auto;
     .btn-oauth:hover { background: #f9f7f3; border-color: var(--muted); }
 
     /* responsive */
-    @media (max-width: 700px) {
-      body { grid-template-columns: 1fr; }
-      .panel-left { display: none; }
+    @media (max-width: 900px) {
+      body { 
+        grid-template-columns: 1fr; 
+      }
+      .panel-left { 
+        display: none; 
+      }
+      .panel-right { 
+        padding: 1.5rem;
+        min-height: auto;
+      }
+      .form-card {
+        max-width: 100%;
+      }
+    }
+
+    @media (max-width: 480px) {
+      body {
+        min-height: auto;
+      }
+      .panel-right {
+        padding: 1rem;
+        align-items: flex-start;
+        justify-content: flex-start;
+        padding-top: 2rem;
+      }
+      .form-card {
+        max-width: 100%;
+      }
+      .form-header {
+        margin-bottom: 1.5rem;
+        min-height: auto;
+      }
+      .form-header h2 {
+        font-size: 1.5rem;
+      }
     }
   </style>
 </head>
@@ -377,8 +445,11 @@ margin:o auto;
   
 <!-- Left decorative panel -->
 <div class="panel-left">
-  <div class="brand">UMU SKILLS MARKETPLACE<span>.</span></div>
-  
+  <div class="brand" style="display:flex; flex-direction:column; align-items: flex-start; gap: 15px;">
+  <img src="umu.jpg" alt="UMU Logo" style="width: 80px; height: auto;">
+  <div>
+  UMU SKILLS MARKETPLACE<span>.</span></div>
+  </div>
   <div class="decorative-ring"></div>
   <div class="hero-text">
     <h1>Welcome<br><em>back.</em></h1>

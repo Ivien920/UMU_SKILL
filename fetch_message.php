@@ -1,87 +1,86 @@
-﻿<?php
-if (session_status() === PHP_SESSION_NONE) {
+<?php
+if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
+
 require 'connection.php';
 
 if (!isset($_SESSION['user_id'])) {
-    die("Not logged in");
+    die("Please login first.");
 }
 
 $current_user = $_SESSION['user_id'];
-$chat_user = $_GET['user'] ?? 0;
+$chat_user = $_GET['user'] ?? null;
 
-/* =========================
-   GET MESSAGES BETWEEN USERS
-========================= */
+if (!$chat_user) {
+    echo '<div class="empty">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <h3>Select a user to start chatting</h3>
+        <p>Choose someone from the sidebar to begin a conversation.</p>
+    </div>';
+    exit;
+}
+
+// Get messages between current user and chat user
 $stmt = $pdo->prepare("
-    SELECT * FROM messages
-    WHERE (sender_id = ? AND receiver_id = ?)
-       OR (sender_id = ? AND receiver_id = ?)
-    ORDER BY sent_at ASC
+    SELECT m.id, m.sender_id, m.receiver_id, m.message, m.file_path, m.file_type, m.created_at,
+           u.name as sender_name, u.profile_photo as sender_photo
+    FROM messages m
+    JOIN users u ON u.user_id = m.sender_id
+    WHERE ((m.sender_id = ? AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = ?))
+    AND m.deleted = 0
+    ORDER BY m.created_at ASC
 ");
 
-$stmt->execute([
-    $current_user,
-    $chat_user,
-    $chat_user,
-    $current_user
-]);
-
+$stmt->execute([$current_user, $chat_user, $chat_user, $current_user]);
 $messages = $stmt->fetchAll();
 
-/* =========================
-   DISPLAY MESSAGES
-========================= */
 foreach ($messages as $msg) {
+    $isMine = $msg['sender_id'] == $current_user;
+    $time = date('H:i', strtotime($msg['created_at']));
 
-    $is_me = $msg['sender_id'] == $current_user;
+    echo '<div class="message ' . ($isMine ? 'mine' : 'other') . '">';
 
-    echo "<div style='
-        max-width:60%;
-        margin:10px;
-        padding:10px;
-        border-radius:10px;
-        clear:both;
-        ";
-
-    if ($is_me) {
-        echo "background:#e60000;color:white;float:right;";
-    } else {
-        echo "background:#111;color:white;float:left;";
+    if (!$isMine) {
+        echo '<div class="message-avatar">';
+        if ($msg['sender_photo']) {
+            echo '<img src="' . htmlspecialchars('uploads/avatars/' . $msg['sender_photo']) . '" alt="">';
+        } else {
+            echo strtoupper(substr($msg['sender_name'], 0, 1));
+        }
+        echo '</div>';
     }
 
-    echo "'>";
+    echo '<div class="message-content">';
 
-    /* ================= TEXT MESSAGE ================= */
-    if (!empty($msg['message'])) {
-        echo "<p style='margin:0 0 5px 0;'>" . htmlspecialchars($msg['message']) . "</p>";
+    if (!$isMine) {
+        echo '<div class="message-sender">' . htmlspecialchars($msg['sender_name']) . '</div>';
     }
 
-    /* ================= FILE DISPLAY ================= */
-    if (!empty($msg['file_path'])) {
+    echo '<div class="message-bubble">';
 
-        $file = $msg['file_path'];
-        $type = $msg['file_type'];
-
-        if (strpos($type, 'image') !== false) {
-            echo "<img src='$file' style='max-width:100%; border-radius:8px;'>";
-        }
-        elseif (strpos($type, 'video') !== false) {
-            echo "<video controls style='max-width:100%; border-radius:8px;'>
-                    <source src='$file'>
-                  </video>";
-        }
-        else {
-            echo "<a href='$file' style='color:#ffcc00;' target='_blank'>Download file</a>";
+    if ($msg['file_path']) {
+        if (strpos($msg['file_type'], 'image/') === 0) {
+            echo '<img src="' . htmlspecialchars($msg['file_path']) . '" class="message-image" alt="Shared image">';
+        } else {
+            echo '<a href="' . htmlspecialchars($msg['file_path']) . '" target="_blank" class="file-link">📎 ' . basename($msg['file_path']) . '</a>';
         }
     }
 
-    echo "<br><small style='font-size:10px;opacity:0.7;'>
-            " . $msg['sent_at'] . "
-          </small>";
+    if ($msg['message']) {
+        echo '<div class="message-text">' . nl2br(htmlspecialchars($msg['message'])) . '</div>';
+    }
 
-    echo "</div>";
+    echo '<div class="message-time">' . $time . '</div>';
+
+    if ($isMine) {
+        echo '<form method="POST" action="delete_messages.php" class="delete-form" style="display:inline;">
+            <input type="hidden" name="message_id" value="' . $msg['id'] . '">
+            <input type="hidden" name="chat_user" value="' . $chat_user . '">
+            <button type="submit" class="delete-btn" title="Delete message">×</button>
+        </form>';
+    }
+
+    echo '</div></div></div>';
 }
 ?>
-

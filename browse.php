@@ -1,10 +1,22 @@
 <?php
-session_start();
-if (!isset($_SESSION['user'])) { header('Location: login.php'); exit; }
 
-$user_name  = htmlspecialchars($_SESSION['name'] ?? 'Learner');
-$user_email = htmlspecialchars($_SESSION['user'] ?? '');
-$initials   = strtoupper(substr($user_name, 0, 1));
+session_start();
+if (!isset($_SESSION['user_id'])) { header('Location: login.php'); exit; }
+include 'connection.php';
+
+$user_id = $_SESSION['user_id'];
+$stmt = $pdo->prepare("SELECT name, email, theme, profile_photo FROM users WHERE user_id = ?");
+$stmt->execute([$user_id]);
+$current_user = $stmt->fetch();
+if (!$current_user) {
+    header('Location: login.php'); exit;
+}
+
+$user_name = htmlspecialchars($current_user['name'] ?? ($_SESSION['name'] ?? 'Learner'));
+$user_email = htmlspecialchars($current_user['email'] ?? ($_SESSION['user'] ?? ''));
+$user_theme = $current_user['theme'] ?? 'light';
+$current_profile_photo = $current_user['profile_photo'] ?? '';
+$initials = strtoupper(substr($user_name, 0, 1));
 
 // Handle booking form submission
 $book_success = false;
@@ -18,17 +30,85 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_skill_id'])) {
     if (!$date || !$time) {
         $book_error = 'Please choose a date and time.';
     } else {
-        /*
-         * INSERT INTO bookings (skill_id, client_id, date, time, message, status)
-         * VALUES ($skill_id, $_SESSION['user_id'], $date, $time, $message, 'pending')
-         */
-        $book_success = true;
+        $stmt = $pdo->prepare("SELECT user_id FROM service WHERE service_id = ?");
+        $stmt->execute([$skill_id]);
+        $seller = $stmt->fetchColumn();
+        if (!$seller) {
+            $book_error = 'Service not found.';
+        } elseif ($seller == $user_id) {
+            $book_error = 'You cannot book your own service.';
+        } else {
+            $request_message = "Date: $date\nTime: $time\n\n" . trim($message);
+            $insert = $pdo->prepare("INSERT INTO request (service_id, requester_id, provider_id, status, created_at, message) VALUES (?, ?, ?, 'pending', NOW(), ?)");
+            $insert->execute([$skill_id, $user_id, $seller, $request_message]);
+            $book_success = true;
+        }
     }
 }
 
+$cat_stmt = $pdo->query("SELECT DISTINCT category FROM service");
+$categories = $cat_stmt->fetchAll(PDO::FETCH_COLUMN);
 // Active category / search filter
 $q        = trim($_GET['q']        ?? '');
 $category = trim($_GET['category'] ?? 'All');
+
+$sql = "SELECT
+s.service_id AS id,
+s.title,
+s.description,
+s.price,
+s.category,
+s.unit,
+u.user_id AS seller_id,
+u.name AS seller_name,
+u.location,
+u.profile_photo AS seller_photo,
+COALESCE(AVG(r.rating), 0) AS avg_rating,
+COUNT(r.review_id) AS review_count
+FROM service s
+JOIN users u ON u.user_id = s.user_id
+LEFT JOIN request req ON req.service_id = s.service_id
+LEFT JOIN review r ON r.request_id = req.request_id
+WHERE s.user_id != ?";
+if ($category && $category !== 'All') {
+    $sql .= " AND s.category = ?";
+}
+if ($q) {
+    $sql .= " AND (s.title LIKE ? OR s.description LIKE ? OR u.name LIKE ? OR s.category LIKE ? )";
+}
+$sql .= " GROUP BY s.service_id ORDER BY avg_rating DESC";
+
+$stmt = $pdo->prepare($sql);
+$params = [$user_id];
+if ($category && $category !== 'All') {
+    $params[] = $category;
+}
+if ($q) {
+    $search = '%'.$q.'%';
+    $params[] = $search;
+    $params[] = $search;
+    $params[] = $search;
+    $params[] = $search;
+}
+$stmt->execute($params);
+$results = $stmt->fetchAll();
+
+$listings = [];
+$filtered = [];
+foreach ($results as $row) {
+  $row['price_fmt']=
+  number_format($row['price'],0);
+  $row ['per'] =$row['unit']  ??'hour';
+  $row['rating']=
+  $row['avg_rating'];
+  $row ['reviews'] = $row['review_count'];
+  $row['tags']=[];
+  $listings[]=$row;
+  $filtered = $listings;
+  $categories = array_unique(array_column($listings,'category'));
+}
+
+
 
 /*
  * --- Replace $listings with a real DB query ---
@@ -43,26 +123,9 @@ $category = trim($_GET['category'] ?? 'All');
  * GROUP BY s.id
  * ORDER BY avg_rating DESC
  */
-$listings = [
-    ['id'=>10,'seller'=>'Amara Osei',   'seller_id'=>5, 'title'=>'React & Next.js Development','category'=>'Technology','price'=>'75,000','per'=>'hour','rating'=>4.9,'reviews'=>12,'tags'=>['React','Next.js','TailwindCSS'],'description'=>'I build blazing-fast web apps using React and Next.js. Available for full projects or hourly consulting.','location'=>'Kampala'],
-    ['id'=>11,'seller'=>'Liam Nakato',  'seller_id'=>6, 'title'=>'Digital Marketing & SEO',    'category'=>'Business',  'price'=>'60,000','per'=>'project','rating'=>4.7,'reviews'=>8,'tags'=>['SEO','Google Ads','Analytics'],'description'=>'Grow your online presence with data-driven SEO and digital marketing strategies.','location'=>'Entebbe'],
-    ['id'=>12,'seller'=>'Fatima Diallo','seller_id'=>7, 'title'=>'Video Editing & Motion',     'category'=>'Creative',  'price'=>'45,000','per'=>'project','rating'=>4.8,'reviews'=>15,'tags'=>['Premiere','After Effects','Color Grading'],'description'=>'Professional video editing for YouTube, adverts and social media. Fast turnaround guaranteed.','location'=>'Kampala'],
-    ['id'=>13,'seller'=>'Samuel Eze',   'seller_id'=>8, 'title'=>'Piano & Music Theory',       'category'=>'Music',     'price'=>'30,000','per'=>'hour','rating'=>5.0,'reviews'=>20,'tags'=>['Piano','Music Theory','Beginner-Friendly'],'description'=>'Learn piano from scratch or advance your existing skills. Online and in-person sessions available.','location'=>'Jinja'],
-    ['id'=>14,'seller'=>'Grace Tumelo', 'seller_id'=>9, 'title'=>'Data Analysis with Python',  'category'=>'Technology','price'=>'80,000','per'=>'hour','rating'=>4.6,'reviews'=>7,'tags'=>['Python','Pandas','Matplotlib'],'description'=>'Turn your raw data into actionable insights. I specialise in data cleaning, visualisation and reporting.','location'=>'Kampala'],
-    ['id'=>15,'seller'=>'Omar Hassan',  'seller_id'=>10,'title'=>'Arabic Language Tutoring',   'category'=>'Education', 'price'=>'25,000','per'=>'hour','rating'=>4.8,'reviews'=>11,'tags'=>['Arabic','Quran','Beginner'],'description'=>'Conversational and classical Arabic for all levels. Patient, structured, and fun lessons.','location'=>'Kampala'],
-    ['id'=>16,'seller'=>'Joy Achieng',  'seller_id'=>11,'title'=>'Yoga & Mindfulness Coaching','category'=>'Health',    'price'=>'35,000','per'=>'session','rating'=>4.9,'reviews'=>18,'tags'=>['Yoga','Meditation','Wellness'],'description'=>'Guided yoga and mindfulness sessions to help you reduce stress and improve flexibility.','location'=>'Kampala'],
-    ['id'=>17,'seller'=>'Kwame Asante', 'seller_id'=>12,'title'=>'Business Plan Writing',      'category'=>'Business',  'price'=>'120,000','per'=>'project','rating'=>4.7,'reviews'=>5,'tags'=>['Business Plan','Strategy','Pitch Deck'],'description'=>'Professional business plan writing and pitch deck creation for startups and SMEs seeking funding.','location'=>'Kampala'],
-    ['id'=>18,'seller'=>'Nadia Bekele', 'seller_id'=>13,'title'=>'Fashion Design & Tailoring', 'category'=>'Creative',  'price'=>'50,000','per'=>'project','rating'=>4.5,'reviews'=>9,'tags'=>['Fashion','Tailoring','Design'],'description'=>'Custom clothing design and tailoring. Bring your style idea to life with quality handwork.','location'=>'Kampala'],
-];
 
-$categories = ['All', 'Technology', 'Creative', 'Business', 'Education', 'Music', 'Health'];
+ 
 
-// Filter listings by search and category
-$filtered = array_filter($listings, function($l) use ($q, $category) {
-    $matchCat   = $category === 'All' || $l['category'] === $category;
-    $matchQuery = !$q || stripos($l['title'], $q) !== false || stripos($l['seller'], $q) !== false || stripos($l['description'], $q) !== false;
-    return $matchCat && $matchQuery;
-});
 
 $category_colors = [
     'Technology' => '#3b6ef0','Creative'=>'#c8522a','Education'=>'#34c97a',
@@ -78,7 +141,7 @@ if (isset($_GET['book'])) {
 }
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="<?= htmlspecialchars($user_theme ?? 'light') ?>">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -87,10 +150,15 @@ if (isset($_GET['book'])) {
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Instrument+Sans:wght@300;400;500&display=swap" rel="stylesheet">
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    :root{
+    :root,[data-theme="dark"]{
       --bg:#0b0f1a;--surface:#141927;--surface2:#1c2438;--border:#252d42;
       --accent:#f5a623;--accent2:#e05c2a;--text:#e8eaf0;--muted:#6b7592;
       --green:#34c97a;--blue:#4a90e2;--red:#e05c5c;--radius:14px;
+    }
+    [data-theme="light"]{
+      --bg:#f0f2f5;--surface:#ffffff;--surface2:#f4f5f7;--border:#dde0e8;
+      --accent:#e08c10;--accent2:#c8522a;--text:#111827;--muted:#6b7280;
+      --green:#16a34a;--blue:#2563eb;--red:#dc2626;--radius:14px;
     }
     body{background:var(--bg);color:var(--text);font-family:'Instrument Sans',sans-serif;min-height:100vh;display:flex}
 
@@ -237,12 +305,13 @@ if (isset($_GET['book'])) {
     <a href="browse.php" class="nav-item active">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Browse Skills
     </a>
+     <a href="messages.php" class="nav-item"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Messages</a>
     <div class="nav-section">Account</div>
     <a href="profile.php" class="nav-item">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Profile
     </a>
-    <a href="#" class="nav-item">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Messages
+    <a href="settings.php" class="nav-item">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 1 0 21 12h-1"/></svg>Settings
     </a>
     <a href="logout.php" class="nav-item">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Log Out
@@ -250,7 +319,13 @@ if (isset($_GET['book'])) {
   </nav>
   <div class="sidebar-footer">
     <div class="user-pill">
-      <div class="avatar"><?= $initials ?></div>
+      <div class="avatar">
+        <?php if (!empty($current_profile_photo) && file_exists(__DIR__ . '/uploads/avatars/' . $current_profile_photo)): ?>
+          <img src="<?= htmlspecialchars('uploads/avatars/' . $current_profile_photo) ?>" alt="<?= $user_name ?>" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+        <?php else: ?>
+          <?= $initials ?>
+        <?php endif; ?>
+      </div>
       <div class="user-info">
         <div class="user-name"><?= $user_name ?></div>
         <div class="user-email"><?= $user_email ?></div>
@@ -301,7 +376,12 @@ if (isset($_GET['book'])) {
       <?= htmlspecialchars($book_error) ?>
     </div>
     <?php endif; ?>
-
+showing <strong><?= count($filtered ??[]) ?></strong>skills
+<?php if (empty($filtered ??[])): ?>
+  <div class ="empty-state">
+    <h3>NO SKILLS FOUND</h3>
+    <?php endif; ?>
+  </div>
     <div class="results-head">
       <div class="results-count">Showing <strong><?= count($filtered) ?></strong> skill<?= count($filtered) !== 1 ? 's' : '' ?><?= $q ? ' for "<strong>'.htmlspecialchars($q).'</strong>"' : '' ?></div>
       <select class="sort-select" onchange="sortCards(this.value)">
@@ -324,7 +404,7 @@ if (isset($_GET['book'])) {
       <?php foreach ($filtered as $i => $s):
         $cc  = $category_colors[$s['category']] ?? '#8a8070';
         $cbg = $cc . '1a';
-        $si  = strtoupper(substr($s['seller'], 0, 1));
+        $sellerInitial = strtoupper(substr($s['seller_name'] ?? '', 0, 1));
         $full  = floor($s['rating']);
         $stars = str_repeat('★', $full) . str_repeat('☆', 5 - $full);
       ?>
@@ -338,9 +418,15 @@ if (isset($_GET['book'])) {
           <div class="card-top">
             <div>
               <div class="seller-row">
-                <div class="seller-avatar"><?= $si ?></div>
+                <div class="seller-avatar">
+                  <?php if (!empty($s['seller_photo']) && file_exists(__DIR__ . '/uploads/avatars/' . $s['seller_photo'])): ?>
+                    <img src="<?= htmlspecialchars('uploads/avatars/' . $s['seller_photo']) ?>" alt="<?= htmlspecialchars($s['seller_name']) ?>" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+                  <?php else: ?>
+                    <?= $sellerInitial ?>
+                  <?php endif; ?>
+                </div>
                 <div>
-                  <div class="seller-name"><?= htmlspecialchars($s['seller']) ?></div>
+                  <div class="seller-name"><?= htmlspecialchars($s['seller_name'] ?? '') ?></div>
                 </div>
               </div>
               <div class="seller-location">
@@ -435,7 +521,7 @@ function openBooking(id, skill) {
   document.getElementById('modalSkillInfo').innerHTML = `
     <div>
       <div class="modal-skill-title">${skill.title}</div>
-      <div class="modal-skill-seller">by ${skill.seller} &nbsp;·&nbsp; ${skill.location}</div>
+      <div class="modal-skill-seller">by ${skill.seller_name} &nbsp;·&nbsp; ${skill.location}</div>
     </div>
     <span class="skill-badge" style="background:${cc}1a;color:${cc};margin-left:auto">${skill.category}</span>
   `;

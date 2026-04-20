@@ -1,6 +1,6 @@
 <?php
 session_start();
-require '../connection.php';
+require 'connection.php';
 
 if (!isset($_SESSION['user_id'])) {
     die("Login required.");
@@ -10,14 +10,11 @@ $current_user = $_SESSION['user_id'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    /* message id from form */
     $message_id = $_POST['message_id'] ?? null;
-
-    /* chat user for redirect */
     $chat_user = $_POST['chat_user'] ?? null;
 
     if ($message_id) {
-
+        // Soft delete - mark as deleted
         $stmt = $pdo->prepare("
             UPDATE messages
             SET deleted = 1
