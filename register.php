@@ -29,26 +29,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$terms) {
         $errors['terms'] = 'You must accept the terms to continue.';
     }
-require 'connection.php';
 
-// Check if email already exists
-$stmt = $pdo->prepare("SELECT user_id FROM users WHERE email = ?");
-$stmt->execute([$email]);
-
-if ($stmt->fetch()) {
-    $errors['email'] = 'An account with this email already exists.';
-} else {
-    $hashed = password_hash($password, PASSWORD_BCRYPT);
-    $stmt   = $pdo->prepare("INSERT INTO users (name, email, password) VALUES (?, ?, ?)");
-    $stmt->execute([$name, $email, $hashed]);
-    $success = true;
-}
     if (empty($errors)) {
-        // --- Replace with real DB insert ---
-        // $hashed = password_hash($password, PASSWORD_BCRYPT);
-        // INSERT INTO users (name, email, password) VALUES (...)
-        $success = true;
-        // --- End demo block ---
+        require 'connection.php';
+
+        // Check if email already exists
+        $stmt = $pdo->prepare("SELECT user_id FROM users WHERE email = ?");
+        $stmt->execute([$email]);
+
+        if ($stmt->fetch()) {
+            $errors['email'] = 'An account with this email already exists.';
+        } else {
+            $hashed = password_hash($password, PASSWORD_BCRYPT);
+            $stmt   = $pdo->prepare("INSERT INTO users (name, email, password) VALUES (?, ?, ?)");
+            $stmt->execute([$name, $email, $hashed]);
+            $success = true;
+        }
     }
 }
 ?>
@@ -56,10 +52,12 @@ if ($stmt->fetch()) {
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes"/>
+  <meta name="description" content="UMU Skills Marketplace Register"/>
   <title>Create Account — UMU SKILLS MARKETPLACE</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -91,47 +89,65 @@ if ($stmt->fetch()) {
     /* ── Left panel ── */
     .panel-left {
       position: relative;
-      background: var(--ink);
+      background: white url('un.jpg') no-repeat center;
+      background-size: 100% 100%;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       padding: 3rem;
       overflow: hidden;
+      min-height: 100vh;
+      width: 100%;
     }
 
     .panel-left::before {
       content: '';
       position: absolute;
-      inset: 0;
-      background:
-        radial-gradient(ellipse 70% 60% at 80% 80%, rgba(200,82,42,.3) 0%, transparent 65%),
-        radial-gradient(ellipse 40% 40% at 10% 20%, rgba(200,82,42,.12) 0%, transparent 60%);
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      background: rgba(0, 0, 0, 0.4);
+      z-index: 1;
     }
 
     .brand {
       position: relative;
       font-family: 'DM Serif Display', serif;
       font-size: 1.6rem;
-      color: var(--paper);
+      color: #000000;
       letter-spacing: -.02em;
+      font-weight: 700;
+      text-shadow: 0 2px 4px rgba(255, 255, 255, 0.8);
+      z-index: 2;
     }
 
-    .brand span { color: var(--accent); }
+    .brand span { 
+      color: #ff0000;
+      font-weight: 800;
+    }
 
     .features {
       position: relative;
-      z-index: 1;
+      z-index: 2;
     }
 
     .features h2 {
       font-family: 'DM Serif Display', serif;
       font-size: clamp(2rem, 3.5vw, 3.2rem);
-      color: var(--paper);
+      color: #000000;
       line-height: 1.1;
       margin-bottom: 2rem;
+      font-weight: 800;
+      text-shadow: 0 2px 6px rgba(255, 255, 255, 0.9);
     }
 
-    .features h2 em { font-style: italic; color: var(--accent); }
+    .features h2 em { 
+      font-style: italic; 
+      color: #cc0000;
+      font-weight: 900;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
 
     .feature-list { list-style: none; }
 
@@ -140,10 +156,11 @@ if ($stmt->fetch()) {
       align-items: flex-start;
       gap: .8rem;
       margin-bottom: 1.1rem;
-      color: #b0a898;
+      color: #1a1a1a;
       font-size: .88rem;
-      font-weight: 300;
+      font-weight: 500;
       line-height: 1.5;
+      text-shadow: 0 1px 2px rgba(255, 255, 255, 0.7);
     }
 
     .feature-list li .icon {
@@ -151,15 +168,15 @@ if ($stmt->fetch()) {
       width: 24px;
       height: 24px;
       border-radius: 50%;
-      background: rgba(200,82,42,.2);
-      border: 1px solid rgba(200,82,42,.35);
+      background: rgba(255, 0, 0, 0.1);
+      border: 1px solid rgba(255, 0, 0, 0.2);
       display: flex;
       align-items: center;
       justify-content: center;
       margin-top: .1rem;
     }
 
-    .feature-list li .icon svg { color: var(--accent); }
+    .feature-list li .icon svg { color: #ff0000; }
 
     .decorative-dots {
       position: absolute;
@@ -170,20 +187,24 @@ if ($stmt->fetch()) {
       grid-template-columns: repeat(6, 1fr);
       gap: 12px;
       opacity: .15;
+      z-index: 1;
     }
 
     .dot {
       width: 4px;
       height: 4px;
       border-radius: 50%;
-      background: var(--paper);
+      background: #ff0000;
     }
 
     .left-footer {
       position: relative;
       font-size: .78rem;
-      color: var(--muted);
+      color: #000000;
       letter-spacing: .04em;
+      font-weight: 600;
+      text-shadow: 0 1px 2px rgba(255, 255, 255, 0.6);
+      z-index: 2;
     }
 
     /* ── Right panel ── */
@@ -412,10 +433,45 @@ if ($stmt->fetch()) {
 
     .btn-oauth:hover { background: #f9f7f3; border-color: var(--muted); }
 
-    @media (max-width: 700px) {
-      body { grid-template-columns: 1fr; }
-      .panel-left { display: none; }
-      .field-row-grid { grid-template-columns: 1fr; }
+    /* responsive */
+    @media (max-width: 900px) {
+      body { 
+        grid-template-columns: 1fr; 
+      }
+      .panel-left { 
+        display: none; 
+      }
+      .panel-right { 
+        padding: 1.5rem;
+        min-height: auto;
+      }
+      .form-card {
+        max-width: 100%;
+      }
+      .field-row-grid { 
+        grid-template-columns: 1fr; 
+      }
+    }
+
+    @media (max-width: 480px) {
+      body {
+        min-height: auto;
+      }
+      .panel-right {
+        padding: 1rem;
+        align-items: flex-start;
+        justify-content: flex-start;
+        padding-top: 2rem;
+      }
+      .form-card {
+        max-width: 100%;
+      }
+      .form-header {
+        margin-bottom: 1.5rem;
+      }
+      .form-header h2 {
+        font-size: 1.5rem;
+      }
     }
   </style>
 </head>
@@ -423,7 +479,10 @@ if ($stmt->fetch()) {
 
 <!-- Left panel -->
 <div class="panel-left">
-  <div class="brand">UMU SKILLS MARKERTPLACE<span>.</span></div>
+  <div class="brand" style="display:flex; flex-direction:row; align-items: center; gap: 12px;">
+    <img src="umu.jpg" alt="UMU Logo" style="width: 60px; height: 60px;">
+    <div>UMU SKILLS MARKETPLACE<span>.</span></div>
+  </div>
 
   <div class="decorative-dots">
     <?php for ($i = 0; $i < 48; $i++): ?><div class="dot"></div><?php endfor; ?>
@@ -488,32 +547,28 @@ if ($stmt->fetch()) {
           <div class="field-error"><?= htmlspecialchars($errors['name']) ?></div>
         <?php endif; ?>
       </div>
-<div class="field">
-  <label>PHONE NUMBER</label>
-  <div class ="input-wrap">
-    <svg class ="icon-prefex" widith="16"
-    height="16" viewbox ="0 0 24 24 "
-    fill="none" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round>
-    <path d="M22 16.92v3a2 2 0 0 1 -2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.63A2
-     2 0 0 14.11 2h3a2 2 0 0 1 2 1.72 12.84 0 012.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 611.27-1.27a2
-     1 22 16.92z"></path>
-    </svg>
-    <input 
-    type="tel"
-    name="phone"
-    placeholder="07......"
-    value="<?= htmlspecialchars($_post['phone']?? '') ?>"
-    class="<?= isset($errors['phone']) ? 'has-error' : ''?>
-    />
-  </div>
-  <?php if (isset($errors['phone'])): ?>
-    <div class =" field-error"><?= htmlspecialchars($errors['phone']) ?></div>
-    <?php endif; ?>
-</div>
+
+      <div class="field">
+        <label>Phone number</label>
+        <div class="input-wrap">
+          <svg class="icon-prefix" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6 15.27 15.27 0 0 0 2.11-.45 2 2 0 0 1 2.81.7l2.81.7a2 2 0 0 1 1.72 2z"/></svg>
+          <input
+            type="tel"
+            name="phone"
+            placeholder="0700123456"
+            value="<?= htmlspecialchars($_POST['phone'] ?? '') ?>"
+            class="<?= isset($errors['phone']) ? 'has-error' : '' ?>"
+            autocomplete="tel"
+          />
+        </div>
+        <?php if (isset($errors['phone'])): ?>
+          <div class="field-error"><?= htmlspecialchars($errors['phone']) ?></div>
+        <?php endif; ?>
+      </div>
 
       <div class="field">
         <label>Email address</label>
-        <div class="input -wrap">
+        <div class="input-wrap">
           <svg class="icon-prefix" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 7l10 7 10-7"/></svg>
           <input
             type="email"

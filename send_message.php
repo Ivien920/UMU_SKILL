@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ========================== */
     if (!empty($_FILES['file']['name'])) {
 
-        $upload_dir = "uploads/";
+        $upload_dir = "uploads/messages/";
 
         if (!is_dir($upload_dir)) {
             mkdir($upload_dir, 0777, true);
